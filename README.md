@@ -1,6 +1,6 @@
 # Rust Apache Clone
 
-*[Elijah Mock](https://github.com/ekcom) (emock3), [Colin](https://github.com/crich46) (colinhr3), [Maanas](https://github.com/maanasbelambe) (belambe2), and [Shreya Rao](https://github.com/Sh-r-eya) (shreya29)*
+*[Elijah Mock](https://github.com/ekcom) (emock3), [Colin](https://github.com/crich46) (colinhr3), [Maanas Belambe](https://github.com/maanasbelambe) (belambe2), and [Shreya Rao](https://github.com/Sh-r-eya) (shreya29)*
 
 ## Project introduction
 [todo: Please provide a brief description of your project. List the goals and objectives of your project and explain why you’ve chosen to work on this project.]
