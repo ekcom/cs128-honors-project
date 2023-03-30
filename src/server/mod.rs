@@ -1,5 +1,12 @@
 // https://docs.rs/http/latest/http/
 use http::{Request, Response};
+use std::path::{PathBuf};
+use std::fs;
+use std::sync::mpsc;
+
+//use apache_clone::ServerError;
+mod error;
+use crate::server::error::{ServerError, ServerErrorType};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum LogLevel {
@@ -32,11 +39,40 @@ impl Server {
         if lvl >= self.log_level {
             println!("{}", msg);
         }
-        todo!(); // log to log file
+        // todo log to log file
     }
     pub fn serve_static(&mut self, path: &str) {
         self.log(&format!("Serving static files from directory {}", path), LogLevel::Info);
-        todo!();
+        match self.get_file_cache(path) {
+            Ok(paths) => {
+                // todo multithread
+                // todo serve file
+                for path in paths {
+                    println!("{:?}", path);
+                }
+            },
+            Err(e) => self.log(&format!("{}", e), LogLevel::Critical),
+        }
+    }
+    /// Returns a listing of the files in path as a vector
+    /// or returns a `ServerError` if there was an error reading any of the files
+    fn get_file_cache(&mut self, path: &str) -> Result<Vec<PathBuf>, ServerError> {
+        let file_paths = fs::read_dir(path);
+        match file_paths {
+            Ok(file_paths) => {
+                let mut paths = Vec::new();
+                for path in file_paths {
+                    match path {
+                        Ok(entry) => paths.push(entry.path()),
+                        Err(_) => return Err(ServerError::new(ServerErrorType::ReadFail)),
+                    };
+                }
+                Ok(paths)
+            },
+            Err(_) => {
+                Err(ServerError::new(ServerErrorType::BadDirectory))
+            }
+        }
     }
 }
 
@@ -64,8 +100,8 @@ mod test {
     use crate::server::*;
     
     #[test]
-    fn create_server() {
-        let server = Server::new(80);
-        todo!();
+    fn serve_static() {
+        let mut server = Server::new(80);
+        server.serve_static("../../public/");
     }
 }
