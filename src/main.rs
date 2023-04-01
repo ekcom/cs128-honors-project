@@ -1,3 +1,7 @@
+use apache_clone::server::*;
+
+const STATIC_DIRECTORY: &str = "./public/";
 fn main() {
-    println!("Hello, world!");
+    let mut server = Server::new(5000);
+    server.serve_static(STATIC_DIRECTORY);
 }
