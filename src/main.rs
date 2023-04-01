@@ -2,6 +2,6 @@ use apache_clone::server::*;
 
 const STATIC_DIRECTORY: &str = "./public/";
 fn main() {
-    let mut server = Server::new(80);
+    let mut server = Server::new(5000);
     server.serve_static(STATIC_DIRECTORY);
 }
