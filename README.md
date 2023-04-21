@@ -17,7 +17,7 @@ This project works as an Apache clone, which will support sending different file
     - potentially [conrod_core](https://crates.io/crates/conrod-core) (GUI), [http](https://docs.rs/http/latest/http/) (HTTP requests)
 - [x] Open a network connection to client
 - [x] Parse client's request to determine which resource is requested
-- [ ] Send proper headers to client
+- [x] Send proper headers to client
 - [x] Read files and send them to client
 - [x] Send a default 404 page if the resource could not be located
 - [ ] Create basic GUI for controlling the server

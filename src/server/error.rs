@@ -40,3 +40,40 @@ impl std::fmt::Display for ServerError {
         writeln!(f, "Error ({}): {}", self.error_type, self.error_msg)
     }
 }
+
+pub fn http_response_from_code(code: i32) -> String {
+    // from https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+    String::from(match code {
+        100 => "Continue",
+        101 => "Switching Protocols",
+        102 => "Processing",
+        103 => "Early Hints",
+        200 => "OK",
+        201 => "Created",
+        202 => "Accepted",
+        203 => "Non-Authoritative Information",
+        204 => "No Content",
+        205 => "Reset Content",
+        206 => "Partial Content",
+        207 => "Multi-Status",
+        208 => "Already Reported",
+        226 => "IM Used",
+        300 => "Multiple Choices",
+        301 => "Moved Permanently",
+        302 => "Found",
+        303 => "See Other",
+        304 => "Not Modified",
+        307 => "Temporary Redirect",
+        308 => "Permanent Redirect",
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        402 => "Payment Required",
+        403 => "Forbidden",
+        404 => "Not Found",
+        400..=499 => "Client Error",
+        500 => "Internal Server Error",
+        // ...
+        500..=599 => "Server Error",
+        _ => "IDK" // panic?
+    })
+}
