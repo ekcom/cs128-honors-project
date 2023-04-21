@@ -77,6 +77,7 @@ impl Server {
         }
     }
     fn open_listener(&self) -> Result<TcpListener, ServerError> {
+        self.log(&format!("Opened listener on http://localhost:{}", self.port), LogLevel::Info);
         let listener = TcpListener::bind(format!("localhost:{}",self.port));
         match listener {
             Ok(listener) => Ok(listener),
@@ -121,7 +122,15 @@ fn handle_static_request(mut stream: TcpStream, serve_path: &str) -> Result<(), 
         Ok(paths) => {
             let buf_reader = BufReader::new(&mut stream);
             let mut lines = buf_reader.lines();
-            let first_line = lines.next().unwrap().unwrap();
+            let first_line = lines.next();
+            if  first_line.is_none() {
+                let error_400_file_path: PathBuf = PathBuf::from("./public/400.html");
+                if let Err(_) = send_file(&mut stream, ServeDetails { path: error_400_file_path, code: 400 }) { // 400 bad request
+                    return Err(ServerError::new(ServerErrorType::ReadFail));
+                }
+                return Ok(());
+            }
+            let first_line = first_line.unwrap().unwrap();
             let mut requested_resource = parse_requested_path(&first_line);
             // special serves:
             if requested_resource == "/" {
@@ -133,7 +142,7 @@ fn handle_static_request(mut stream: TcpStream, serve_path: &str) -> Result<(), 
                 // todo better way to check this
                 // todo better way to get public directory
                 if path.to_str().unwrap() == format!("./public{}", requested_resource) {
-                    if let Err(_) = send_file(&mut stream, path, "200") {
+                    if let Err(_) = send_file(&mut stream, ServeDetails { path, code: 200 }) {
                         return Err(ServerError::new(ServerErrorType::ReadFail));
                     }
                     return Ok(());
@@ -142,7 +151,7 @@ fn handle_static_request(mut stream: TcpStream, serve_path: &str) -> Result<(), 
             // still here? not found
             // todo programmatically find error_404_file_path
             let error_404_file_path: PathBuf = PathBuf::from("./public/404.html");
-            if let Err(_) = send_file(&mut stream, error_404_file_path, "404") {
+            if let Err(_) = send_file(&mut stream, ServeDetails { path: error_404_file_path, code: 404 }) {
                 return Err(ServerError::new(ServerErrorType::ReadFail));
             }
             // todo report not found to server
@@ -162,12 +171,34 @@ fn parse_requested_path(http_line: &str) -> &str {
     &http_line[prefix.len()..http_line.len()-suffix.len()]
 }
 // todo validate status_code and use http library
-fn send_file(stream: &mut TcpStream, path: PathBuf, status_code: &str) -> Result<(), std::io::Error> { 
+struct ServeDetails {
+    path: PathBuf,
+    code: i32,
+}
+fn send_file(stream: &mut TcpStream, serve_details: ServeDetails) -> Result<(), std::io::Error> { 
     //let full_path = std::path::Path::new(&format!("{}{}", serve_path, path));
-    println!("{:?}",path);
-    let data_to_send = fs::read_to_string(path).unwrap();
-    let res = format!("HTTP/1.1 {} OK\nContent-Length: {}\n\n{}", status_code, data_to_send.len(), data_to_send);
+    let data_to_send = fs::read_to_string(&serve_details.path).unwrap();
+    let res = format!("HTTP/1.1 {} {}\nContent-Length: {}{}\n\n{}",
+        serve_details.code,
+        error::http_response_from_code(serve_details.code),
+        data_to_send.len(),
+        get_mime_type_header(serve_details.path.extension().unwrap().to_str().unwrap()),
+        data_to_send);
     stream.write_all(res.as_bytes())
+}
+
+fn get_mime_type_header(extension: &str) -> String {
+    let content_type = match extension {
+        "html" => "text/html",
+        "css" => "text/css",
+        "js" => "text/javascript",
+        _ => "" // unknown
+    };
+    if content_type == "" {
+        "".into() // return empty
+    } else {
+        format!("\nContent-Type: {}", content_type)
+    }
 }
 
 /*
@@ -200,6 +231,6 @@ mod test {
     }
     #[test]
     fn parse_requested_path() {
-        assert_eq!(parse_requested_path("GET /index.html HTTP/1.1"), "/index.html");
+        assert_eq!(crate::server::parse_requested_path("GET /index.html HTTP/1.1"), "/index.html");
     }
 }
