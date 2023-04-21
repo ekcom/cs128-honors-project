@@ -27,9 +27,9 @@ This project works as an Apache clone, which will support sending different file
 
 - [ ] Create multiple threads to handle multiple requests at the same time
     - [ ] Have a setting (configurable through the GUI) which determines the number of threads to spawn
-- [ ] Create a configurable option to choose the directory to serve files from
+- [x] Create a configurable option to choose the directory to serve files from
 - [ ] Create a configurable option to set 404 (not found) page
-- [ ] Create a configurable option to change port to run on
+- [x] Create a configurable option to change port to run on
 - [ ] Persist settings upon restarting the program (store in a file)
 - [ ] Write requests to a log file
 - [ ] Improve GUI appearance
