@@ -1,7 +1,7 @@
 use http::{Request, Response};
 // https://docs.rs/http/latest/http/
-use std::path::{PathBuf};
-use std::fs;
+use std::path::{PathBuf, Path};
+use std::fs::{self, File};
 //use std::sync::mpsc;
 use std::thread;
 use std::net::{TcpListener, TcpStream}; // https://doc.rust-lang.org/std/net/struct.TcpListener.html
@@ -22,28 +22,50 @@ pub enum LogLevel {
     Error,
     Critical,
 }
+fn get_readable_logLevel(ll: &LogLevel) -> &'static str {
+    match ll {
+        LogLevel::Debug => "Debug",
+        LogLevel::Info => "Info",
+        LogLevel::Warning => "Warning",
+        LogLevel::Error => "Error",
+        LogLevel::Critical => "Critical",
+    }
+}
 
 pub struct Server {
     port: usize,
     log_level: LogLevel,
+    log_file: File,
+    error_files: ErrorFileSystem::ErrorFileSystem,
 }
 
 impl Server {
     pub fn new(port: usize) -> Server {
+        let log_file_path = Path::new("logs/server.log");
+        if !log_file_path.exists() {
+            fs::create_dir_all("logs").unwrap();
+            File::create(log_file_path).unwrap();
+        }
+        let log_file = File::options().append(true).open(log_file_path).unwrap();
         Server {
             port,
             log_level: LogLevel::Error,
+            log_file,
+            error_files: ErrorFileSystem::ErrorFileSystem::new(),
         }
     }
     pub fn set_log_level(&mut self, lvl: LogLevel) {
         self.log_level = lvl;
     }
     //fn log<T>(&self, msg: T, lvl: LogLevel) {
-    fn log(&self, msg: &str, lvl: LogLevel) {
+    fn log(&mut self, msg: &str, lvl: LogLevel) {
         if lvl >= self.log_level {
-            println!("{}", msg);
+            println!("[{}] {}", get_readable_logLevel(&lvl), msg);
         }
         // todo log to log file
+        if let Err(_) = writeln!(self.log_file, "[{}] {}", get_readable_logLevel(&lvl), msg) {
+            println!("[Error] Failed to write to log file");
+        }
     }
     pub fn serve_static(&mut self, path: &str) {
         // todo return a join handle?
@@ -76,13 +98,16 @@ impl Server {
             Err(e) => self.log(&format!("{}", e), LogLevel::Critical),
         }
     }
-    fn open_listener(&self) -> Result<TcpListener, ServerError> {
+    fn open_listener(&mut self) -> Result<TcpListener, ServerError> {
         self.log(&format!("Opened listener on http://localhost:{}", self.port), LogLevel::Info);
         let listener = TcpListener::bind(format!("localhost:{}",self.port));
         match listener {
             Ok(listener) => Ok(listener),
             Err(_) => Err(ServerError::new(ServerErrorType::BadPort)),
         }
+    }
+    pub fn add_custom_error_file(&mut self, code: i32, file_path: &str) {
+        self.error_files.add_error_file(code, PathBuf::from(file_path));
     }
 }
 /// Returns a listing of the files in path as a vector
@@ -220,12 +245,46 @@ fn add_server_headers<T>(response: &mut Response<T>) {
 }
 */
 
+mod ErrorFileSystem {
+    use std::{path::PathBuf, collections::HashMap};
+    
+    pub struct ErrorFileSystem {
+        custom_paths: HashMap<i32, PathBuf>,
+    }
+
+    impl ErrorFileSystem {
+        pub fn new() -> ErrorFileSystem {
+            Self {
+                custom_paths: HashMap::new(),
+            }
+        }
+        pub fn add_error_file(&mut self, code: i32, file: PathBuf) {
+            self.custom_paths.insert(code, file);
+        }
+        fn get_error_file_for(&self, status_code: i32) -> PathBuf {
+            if let Some(file) = self.custom_paths.get(&status_code) {
+                return file.clone();
+            }
+            get_default_error_file_for(status_code)
+        }
+    }
+    fn get_default_error_file_for(status_code: i32) -> PathBuf {
+        PathBuf::from(match status_code {
+            404 => "./public/404.html",
+            400 => "./public/400.html",
+            500 => "./public/500.html",
+            _ => "./public/500.html", // unknown
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::server::*;
     
     #[test]
     fn serve_static() {
+        println!("No error should be thrown opening serve file and log file");
         let mut server = Server::new(80);
         server.serve_static("../../public/");
     }

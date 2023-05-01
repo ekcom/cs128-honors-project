@@ -13,8 +13,7 @@ This project works as an Apache clone, which will support sending different file
 
 #### Checkpoint 1
 
-- [ ] Research crates to use
-    - potentially [conrod_core](https://crates.io/crates/conrod-core) (GUI), [http](https://docs.rs/http/latest/http/) (HTTP requests)
+- [x] Research crates to use
 - [x] Open a network connection to client
 - [x] Parse client's request to determine which resource is requested
 - [x] Send proper headers to client
@@ -28,10 +27,10 @@ This project works as an Apache clone, which will support sending different file
 - [ ] Create multiple threads to handle multiple requests at the same time
     - [ ] Have a setting (configurable through the GUI) which determines the number of threads to spawn
 - [x] Create a configurable option to choose the directory to serve files from
-- [ ] Create a configurable option to set 404 (not found) page
+- [x] Create a configurable option to set 404 (not found) page
 - [x] Create a configurable option to change port to run on
 - [ ] Persist settings upon restarting the program (store in a file)
-- [ ] Write requests to a log file
+- [x] Write requests to a log file
 - [ ] Improve GUI appearance
 
 #### Final submission
