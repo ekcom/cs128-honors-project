@@ -7,7 +7,7 @@ A multithreaded HTTP server which serves static files with proper headers and MI
 ~~This project also has a GUI which can be used to start the server and configure settings.~~
 
 ## Technical overview
-This project works as an Apache clone, which will support sending different files as an HTTP server. It will scan the local directory for the requested path from the HTTP GET request and serve that file if found or serve the 404 page if not found.~~ This project has a GUI interface from which the server can be started/stopped and settings can be configured.~~ Settings include setting the port to host the server on and which directory to serve static files from, and can be configured using the public interface (as used in `main.rs`).~~ Additionally, this project will be multithreaded, meaning it can handle multiple requests simultaneously from spawned worker threads.~~
+This project works as an Apache clone, which will support sending different files as an HTTP server. It will scan the local directory for the requested path from the HTTP GET request and serve that file if found or serve the 404 page if not found. ~~This project has a GUI interface from which the server can be started/stopped and settings can be configured.~~ Settings include setting the port to host the server on and which directory to serve static files from, and can be configured using the public interface (as used in `main.rs`). ~~Additionally, this project will be multithreaded, meaning it can handle multiple requests simultaneously from spawned worker threads.~~
 
 ### Task list
 
