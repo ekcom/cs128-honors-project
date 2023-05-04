@@ -4,17 +4,16 @@
 
 ## Project introduction
 A multithreaded HTTP server which serves static files with proper headers and MIME types, similar to a basic Apache server.
-This project also has a GUI which can be used to start the server and configure settings.
+~~This project also has a GUI which can be used to start the server and configure settings.~~
 
 ## Technical overview
-This project works as an Apache clone, which will support sending different files as an HTTP server. It will scan the local directory for the requested path from the HTTP GET request and serve that file if found or serve the 404 page if not found. Additionally, this project has a GUI interface from which the server can be started/stopped and settings can be configured. Settings include setting the port to host the server on and which directory to serve static files from. Additionally, this project will be multithreaded, meaning it can handle multiple requests simultaneously from spawned worker threads.
+This project works as an Apache clone, which will support sending different files as an HTTP server. It will scan the local directory for the requested path from the HTTP GET request and serve that file if found or serve the 404 page if not found.~~ This project has a GUI interface from which the server can be started/stopped and settings can be configured.~~ Settings include setting the port to host the server on and which directory to serve static files from, and can be configured using the public interface (as used in `main.rs`).~~ Additionally, this project will be multithreaded, meaning it can handle multiple requests simultaneously from spawned worker threads.~~
 
 ### Task list
 
 #### Checkpoint 1
 
-- [ ] Research crates to use
-    - potentially [conrod_core](https://crates.io/crates/conrod-core) (GUI), [http](https://docs.rs/http/latest/http/) (HTTP requests)
+- [x] Research crates to use
 - [x] Open a network connection to client
 - [x] Parse client's request to determine which resource is requested
 - [x] Send proper headers to client
@@ -28,10 +27,10 @@ This project works as an Apache clone, which will support sending different file
 - [ ] Create multiple threads to handle multiple requests at the same time
     - [ ] Have a setting (configurable through the GUI) which determines the number of threads to spawn
 - [x] Create a configurable option to choose the directory to serve files from
-- [ ] Create a configurable option to set 404 (not found) page
+- [x] Create a configurable option to set 404 (not found) page
 - [x] Create a configurable option to change port to run on
 - [ ] Persist settings upon restarting the program (store in a file)
-- [ ] Write requests to a log file
+- [x] Write requests to a log file
 - [ ] Improve GUI appearance
 
 #### Final submission
@@ -39,8 +38,8 @@ This project works as an Apache clone, which will support sending different file
 - [ ] Wrap up previous checklists
 - [ ] Attempt to [cache data](https://httpd.apache.org/docs/current/caching.html) and not resend pages to users
 - [ ] Attempt TLS encryption through HTTPS
-- [ ] Squash bugs
-- [ ] Create <10 min video of project demo, discussion, and brief code overview
+- [x] Squash bugs
+- [x] Create <10 min video of project demo, discussion, and brief code overview
 
 ## Possible challenges
 
@@ -53,7 +52,3 @@ Some challenges from this project include learning how to interface with a netwo
 Apache: https://www.apache.org/
 
 XAMPP: https://www.apachefriends.org/
-
-### Guidance
-
-[list any tutorials used here]

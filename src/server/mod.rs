@@ -1,7 +1,6 @@
-use http::{Request, Response};
-// https://docs.rs/http/latest/http/
-use std::path::{PathBuf};
-use std::fs;
+//use http::{Request, Response};
+use std::path::{PathBuf, Path};
+use std::fs::{self, File};
 //use std::sync::mpsc;
 use std::thread;
 use std::net::{TcpListener, TcpStream}; // https://doc.rust-lang.org/std/net/struct.TcpListener.html
@@ -11,40 +10,74 @@ use std::io::prelude::*;
 //use apache_clone::ServerError;
 mod error;
 use crate::server::error::{ServerError, ServerErrorType};
+use error_file_system::ErrorFileSystem;
 
+/// The level of verbosity to write logs with
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum LogLevel {
     // due to implicit discriminants,
     // the log levels increase numerically
+    // (that is, they are ordered)
     Debug,
     Info,
     Warning,
     Error,
     Critical,
 }
+/// Returns the LogLevel passed in `&str` format
+fn get_readable_loglevel(ll: &LogLevel) -> &'static str {
+    match ll {
+        LogLevel::Debug => "Debug",
+        LogLevel::Info => "Info",
+        LogLevel::Warning => "Warning",
+        LogLevel::Error => "Error",
+        LogLevel::Critical => "Critical",
+    }
+}
 
+/// A static server, which stores relevant configuration information
 pub struct Server {
     port: usize,
     log_level: LogLevel,
+    log_file: File,
+    error_files: ErrorFileSystem,
 }
 
 impl Server {
+    /// Creates a new server on port `port`
+    /// Note: does not start the server upon construction
     pub fn new(port: usize) -> Server {
+        let log_file_path = Path::new("logs/server.log");
+        if !log_file_path.exists() {
+            fs::create_dir_all("logs").unwrap();
+            File::create(log_file_path).unwrap();
+        }
+        let log_file = File::options().append(true).open(log_file_path).unwrap();
         Server {
             port,
             log_level: LogLevel::Error,
+            log_file,
+            error_files: ErrorFileSystem::new(),
         }
     }
+    /// Adjusts the minimum log level of which to console logs to
     pub fn set_log_level(&mut self, lvl: LogLevel) {
         self.log_level = lvl;
     }
+    /// Writes a log message to the console if above the log level
+    /// And writes a log message to the log file
     //fn log<T>(&self, msg: T, lvl: LogLevel) {
-    fn log(&self, msg: &str, lvl: LogLevel) {
+    fn log(&mut self, msg: &str, lvl: LogLevel) {
         if lvl >= self.log_level {
-            println!("{}", msg);
+            println!("[{}] {}", get_readable_loglevel(&lvl), msg);
         }
-        // todo log to log file
+        if let Err(_) = writeln!(self.log_file, "[{}] {}", get_readable_loglevel(&lvl), msg) {
+            println!("[Error] Failed to write to log file");
+        }
     }
+    /// Starts a static server, serving files from `path`.
+    /// Will handle any network requests by serving them a file from that relative path,
+    /// or a 404 page if not found.
     pub fn serve_static(&mut self, path: &str) {
         // todo return a join handle?
         self.log(&format!("Serving static files from directory {}", path), LogLevel::Info);
@@ -52,9 +85,10 @@ impl Server {
             Ok(listener) => {
                 let path_cpy: String = path.into(); // make String for better lifetime
                 let be_a_server = move || {
-                    for mut stream_res in listener.incoming() {
+                    for stream_res in listener.incoming() {
                         match stream_res {
                             Ok(stream) => {
+                                // how to pass self?
                                 let serve = handle_static_request(stream, &path_cpy);
                                 if serve.is_err() {
                                     //self.log(&format!("{}", serve.unwrap_err()), LogLevel::Error);
@@ -76,13 +110,20 @@ impl Server {
             Err(e) => self.log(&format!("{}", e), LogLevel::Critical),
         }
     }
-    fn open_listener(&self) -> Result<TcpListener, ServerError> {
+    /// Opens a TCP listener on a port
+    fn open_listener(&mut self) -> Result<TcpListener, ServerError> {
         self.log(&format!("Opened listener on http://localhost:{}", self.port), LogLevel::Info);
         let listener = TcpListener::bind(format!("localhost:{}",self.port));
         match listener {
             Ok(listener) => Ok(listener),
             Err(_) => Err(ServerError::new(ServerErrorType::BadPort)),
         }
+    }
+    /// Adds a custom error file to be served in the static server.
+    /// Whenever an error of HTTP code `code` is thrown, the page at
+    /// `file_path` will be served to the client.
+    pub fn add_custom_error_file(&mut self, code: i32, file_path: &str) {
+        self.error_files.add_error_file(code, PathBuf::from(file_path));
     }
 }
 /// Returns a listing of the files in path as a vector
@@ -116,6 +157,10 @@ fn get_files(serve_path: &str) -> Result<Vec<PathBuf>, ServerError> {
         }
     }
 }
+/// Handles a request to the server
+/// by serving a file based on the stream's request.
+/// 
+/// Parses HTTP network requests to deduce the requested resource
 // todo make these parameters more consise (e.g. better path useage)
 fn handle_static_request(mut stream: TcpStream, serve_path: &str) -> Result<(), ServerError> {
     match get_files(serve_path) {
@@ -149,8 +194,7 @@ fn handle_static_request(mut stream: TcpStream, serve_path: &str) -> Result<(), 
                 }
             }
             // still here? not found
-            // todo programmatically find error_404_file_path
-            let error_404_file_path: PathBuf = PathBuf::from("./public/404.html");
+            let error_404_file_path: PathBuf = PathBuf::from("./public/404.html"); //self.error_files.get_error_file_for(404)
             if let Err(_) = send_file(&mut stream, ServeDetails { path: error_404_file_path, code: 404 }) {
                 return Err(ServerError::new(ServerErrorType::ReadFail));
             }
@@ -162,13 +206,13 @@ fn handle_static_request(mut stream: TcpStream, serve_path: &str) -> Result<(), 
     }
 }
 /// Parses the requested path
-/// Only works for HTTP GET
+/// Only works for HTTP 1.1 GET requests.
 fn parse_requested_path(http_line: &str) -> &str {
     /*let r = Regex::new("GET [\\s]* HTTP/1.1").unwrap();
     &String::from(r.captures(http_line).unwrap()[0]).clone()*/
-    const prefix: &str = "GET ";
-    const suffix: &str = " HTTP/1.1";
-    &http_line[prefix.len()..http_line.len()-suffix.len()]
+    const PREFIX: &str = "GET ";
+    const SUFFIX: &str = " HTTP/1.1";
+    &http_line[PREFIX.len()..http_line.len()-SUFFIX.len()]
 }
 // todo validate status_code and use http library
 struct ServeDetails {
@@ -187,6 +231,8 @@ fn send_file(stream: &mut TcpStream, serve_details: ServeDetails) -> Result<(), 
     stream.write_all(res.as_bytes())
 }
 
+/// Returns the required MIME type to serve
+/// based on the file extension of the resource.
 fn get_mime_type_header(extension: &str) -> String {
     let content_type = match extension {
         "html" => "text/html",
@@ -201,24 +247,38 @@ fn get_mime_type_header(extension: &str) -> String {
     }
 }
 
-/*
-fn response(req: Request<()>) -> http::Result<Response<()>> {
-    match req.uri().path() {
-        "/" => index(req),
-        "/foo" => foo(req),
-        "/bar" => bar(req),
-        _ => not_found(req),
+mod error_file_system {
+    use std::{path::PathBuf, collections::HashMap};
+    
+    pub struct ErrorFileSystem {
+        custom_paths: HashMap<i32, PathBuf>,
+    }
+
+    impl ErrorFileSystem {
+        pub fn new() -> ErrorFileSystem {
+            Self {
+                custom_paths: HashMap::new(),
+            }
+        }
+        pub fn add_error_file(&mut self, code: i32, file: PathBuf) {
+            self.custom_paths.insert(code, file);
+        }
+        fn get_error_file_for(&self, status_code: i32) -> PathBuf {
+            if let Some(file) = self.custom_paths.get(&status_code) {
+                return file.clone();
+            }
+            get_default_error_file_for(status_code)
+        }
+    }
+    fn get_default_error_file_for(status_code: i32) -> PathBuf {
+        PathBuf::from(match status_code {
+            404 => "./public/404.html",
+            400 => "./public/400.html",
+            500 => "./public/500.html",
+            _ => "./public/500.html", // unknown
+        })
     }
 }
-use http::{HeaderValue, Response, StatusCode};
-use http::header::CONTENT_TYPE;
-
-fn add_server_headers<T>(response: &mut Response<T>) {
-    response.headers_mut()
-        .insert(CONTENT_TYPE, HeaderValue::from_static("text/html"));
-    *response.status_mut() = StatusCode::OK;
-}
-*/
 
 #[cfg(test)]
 mod test {
@@ -226,6 +286,7 @@ mod test {
     
     #[test]
     fn serve_static() {
+        println!("No error should be thrown opening serve file and log file");
         let mut server = Server::new(80);
         server.serve_static("../../public/");
     }
